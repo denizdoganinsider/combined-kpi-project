@@ -12,19 +12,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue' // ref'ı burada import edin
-import { useRouter } from 'vue-router' // useRouter'ı burada import edin
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const email = ref('')
 const password = ref('')
 const router = useRouter()
 
 const login = () => {
-  // Örnek olarak giriş kontrolü yapıyoruz
   if (email.value === 'user@example.com' && password.value === 'password') {
-    // Başarılı girişten sonra token'ı localStorage'a kaydediyoruz
     localStorage.setItem('auth_token', 'sample_token')
-    router.push('/')  // Ana sayfaya yönlendirme
+    router.push('/')
   } else {
     alert('Invalid credentials')
   }
