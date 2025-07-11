@@ -24,5 +24,10 @@ func main() {
 	userController := controller.NewUserController(userService)
 	userController.RegisterRoutes(e)
 
+	movieRepository := repository.NewMovieRepository(db)
+	movieService := service.NewMovieService(movieRepository)
+	movieController := controller.NewMovieController(movieService)
+	movieController.RegisterRoutes(e)
+
 	log.Fatalln(e.Start(":3000"))
 }
