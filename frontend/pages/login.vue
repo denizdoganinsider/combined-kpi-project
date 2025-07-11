@@ -41,10 +41,6 @@ h1 {
   gap: 5%;
   border: 1px solid #c8c8c8;
   border-radius: 8px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: 500px;
   height: 500px;
 }
