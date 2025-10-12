@@ -1,116 +1,157 @@
 package controller
 
 import (
+	"fmt"
+	"net/http"
+	"strconv"
+
 	"myapp-backend/controller/request"
 	"myapp-backend/controller/response"
 	"myapp-backend/service"
-	"myapp-backend/utils"
-	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 )
 
 type UserController struct {
-	userService *service.UserService
+	userService service.IUserService
 }
 
-func NewUserController(userService *service.UserService) *UserController {
+func NewUserController(userService service.IUserService) *UserController {
 	return &UserController{
 		userService: userService,
 	}
 }
 
 func (userController *UserController) RegisterRoutes(e *echo.Echo) {
-	e.GET("/home", userController.showHome)
-	e.GET("/login", userController.showLogin)
-	e.POST("/login", userController.handleLogin)
-	e.POST("/signup", userController.handleSignup)
-	e.RouteNotFound("/*", userController.showNotFound)
+	/*
+		Should be implemented
+
+		GET /api/v1/users
+		GET /api/v1/users/{id}
+		PUT /api/v1/users/{id}
+		DELETE /api/v1/users/{id}
+
+		Extras
+
+		POST /api/v1/users
+	*/
+
+	e.GET("/", userController.HandleRootPage)
+
+	e.POST("/api/v1/submit", userController.SubmitNewUser)
+
+	e.GET("/api/v1/users", userController.GetAllUsers)
+	e.GET("/api/v1/users/:id", userController.GetUserById)
+	e.POST("/api/v1/users", userController.AddUser)
+	e.PUT("/api/v1/users/:id", userController.UpdateUsername)
+	e.DELETE("/api/v1/users/:id", userController.DeleteUserById)
 }
 
-func (userController *UserController) showHome(c echo.Context) error {
-	cookie, err := c.Cookie("token")
-	if err != nil {
-		return c.Redirect(http.StatusSeeOther, "/login")
-	}
-
-	claims, err := utils.ParseJWT(cookie.Value)
-	if err != nil {
-		return c.String(http.StatusSeeOther, "/login")
-	}
-
-	// Güvenli type assertion
-	emailInterface := claims["email"]
-	email, ok := emailInterface.(string)
-	if !ok {
-		return c.String(http.StatusInternalServerError, "Invalid token payload: email not string")
-	}
-
-	return c.Render(http.StatusOK, "home.html", map[string]interface{}{
-		"Email": email,
-	})
+func (userController *UserController) HandleRootPage(c echo.Context) error {
+	return c.HTML(http.StatusOK,
+		`<form action="/api/v1/submit" method="POST">
+			<label for="name">First name:</label>
+			<input type="text" id="name" name="name"><br><br>
+			<label for="surname">Last name:</label>
+			<input type="text" id="surname" name="surname"><br><br>
+			<input type="submit" value="Submit">
+		</form>`)
 }
 
-func (userController *UserController) showLogin(c echo.Context) error {
-	_, err := c.Cookie("token")
+func (userController *UserController) SubmitNewUser(c echo.Context) error {
+	firstName := c.FormValue("name")
+	lastName := c.FormValue("surname")
 
-	if err != nil {
-		return c.File("static/login.html")
+	fmt.Println("Received Form Data:")
+	fmt.Println("First Name:", firstName)
+	fmt.Println("Last Name:", lastName)
+
+	return c.String(http.StatusOK, "Form submitted successfully!")
+}
+
+func (userController *UserController) GetAllUsers(c echo.Context) error {
+	role := c.QueryParam("role")
+
+	if len(role) == 0 {
+		allUsers := userController.userService.GetAllUsers()
+		return c.JSON(http.StatusOK, response.ToResponseList(allUsers))
 	}
 
-	return c.Redirect(http.StatusSeeOther, "/home")
+	usersWithGivenRole := userController.userService.GetUsersByRole(role)
+	return c.JSON(http.StatusOK, response.ToResponseList(usersWithGivenRole))
 }
 
-func (userController *UserController) handleLogin(c echo.Context) error {
-	email := c.FormValue("email")
-	password := c.FormValue("password")
+func (userController *UserController) GetUserById(c echo.Context) error {
+	id := c.Param("id")
+	userId, _ := strconv.Atoi(id)
 
-	return userController.authenticate(email, password, c)
-}
-
-func (userController *UserController) handleSignup(c echo.Context) error {
-	name := c.FormValue("first-name")
-	surname := c.FormValue("last-name")
-	email := c.FormValue("email")
-	password := c.FormValue("password")
-
-	err := userController.userService.CreateUser(request.User{
-		Name:     name,
-		Surname:  surname,
-		Email:    email,
-		Password: password,
-	})
+	userContent, err := userController.userService.GetById(int64(userId))
 
 	if err != nil {
-		return c.JSON(http.StatusAccepted, response.ErrorResponse{
+		return c.JSON(http.StatusNotFound, response.ErrorResponse{
 			Message: err.Error(),
 		})
 	}
 
-	return userController.authenticate(email, password, c)
+	return c.JSON(http.StatusOK, response.ToResponse(userContent))
 }
 
-func (userController *UserController) authenticate(email string, password string, c echo.Context) error {
-	token, err := userController.userService.Authenticate(email, password)
+func (userController *UserController) AddUser(c echo.Context) error {
+	var addUserRequest request.AddUserRequest
+
+	bindError := c.Bind(&addUserRequest)
+
+	if bindError != nil {
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Message: bindError.Error(),
+		})
+	}
+
+	validationError := userController.userService.AddUser(addUserRequest.ToModel())
+
+	if validationError != nil {
+		return c.JSON(http.StatusUnprocessableEntity, response.ErrorResponse{
+			Message: validationError.Error(),
+		})
+	}
+
+	return c.NoContent(http.StatusCreated)
+}
+
+func (userController *UserController) UpdateUsername(c echo.Context) error {
+	id := c.Param("id")
+	userId, _ := strconv.Atoi(id)
+
+	username := c.QueryParam("username")
+
+	if len(username) == 0 {
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Message: "Username is required",
+		})
+	}
+
+	if len(username) < 4 {
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Message: "Username should have at least 4 characters",
+		})
+	}
+
+	userController.userService.UpdateUsername(username, int64(userId))
+
+	return c.NoContent(http.StatusOK)
+}
+
+func (userController *UserController) DeleteUserById(c echo.Context) error {
+	id := c.Param("id")
+	userId, _ := strconv.Atoi(id)
+
+	err := userController.userService.DeleteById(int64(userId))
 
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
+		return c.JSON(http.StatusNotFound, response.ErrorResponse{
 			Message: err.Error(),
 		})
 	}
 
-	c.SetCookie(&http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: false,
-		Expires:  time.Now().Add(1 * time.Minute),
-	})
-
-	return c.Redirect(http.StatusSeeOther, "/home")
-}
-
-func (userController *UserController) showNotFound(c echo.Context) error {
-	return c.File("static/404.html")
+	return c.NoContent(http.StatusOK)
 }
