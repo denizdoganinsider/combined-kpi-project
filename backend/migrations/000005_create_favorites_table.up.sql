@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS favorites (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  movie_id BIGINT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY ux_user_movie (user_id, movie_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+);
