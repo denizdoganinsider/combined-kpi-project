@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"log"
+	"sync"
 
 	"myapp-backend/domain"
 	"myapp-backend/repository"
@@ -16,6 +17,7 @@ type IBalanceService interface {
 
 type BalanceService struct {
 	balanceRepository repository.IBalanceRepository
+	mu                sync.Mutex
 }
 
 func NewBalanceService(balanceRepository repository.IBalanceRepository) IBalanceService {
@@ -25,6 +27,7 @@ func NewBalanceService(balanceRepository repository.IBalanceRepository) IBalance
 }
 
 func (balanceService *BalanceService) GetBalanceByUserID(userID int64) (*domain.Balance, error) {
+	// Read-only → lock gerekmez (istersen RWMutex ile optimize edilebilir)
 	balance, err := balanceService.balanceRepository.GetBalanceByUserID(userID)
 	if err != nil {
 		return nil, err
@@ -33,22 +36,29 @@ func (balanceService *BalanceService) GetBalanceByUserID(userID int64) (*domain.
 }
 
 func (balanceService *BalanceService) UpdateBalance(userID int64, amount float64) error {
+	balanceService.mu.Lock()
+	defer balanceService.mu.Unlock()
+
 	balance, err := balanceService.balanceRepository.GetBalanceByUserID(userID)
 	if err != nil && err.Error() != "user doesn't have balance" {
 		return err
 	}
 
-	/* if we cannot find any balance for user, system create a new balance */
+	// Kullanıcının bakiyesi yoksa
 	if balance == nil {
+		if amount < 0 {
+			return errors.New("insufficient balance")
+		}
+
 		err = balanceService.balanceRepository.CreateBalance(userID, amount)
 		if err != nil {
 			return err
 		}
+
 		log.Printf("New balance created for user %d with amount %f", userID, amount)
 		return nil
 	}
 
-	/* if there is a balance we update to new balance */
 	newAmount := balance.Amount + amount
 	if newAmount < 0 {
 		return errors.New("insufficient balance")
@@ -64,7 +74,9 @@ func (balanceService *BalanceService) UpdateBalance(userID int64, amount float64
 }
 
 func (balanceService *BalanceService) CreateBalance(userID int64, amount float64) error {
-	/* Create new account */
+	balanceService.mu.Lock()
+	defer balanceService.mu.Unlock()
+
 	err := balanceService.balanceRepository.CreateBalance(userID, amount)
 	if err != nil {
 		return err
