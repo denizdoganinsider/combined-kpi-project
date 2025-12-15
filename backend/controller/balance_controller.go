@@ -26,6 +26,7 @@ func (balanceController *BalanceController) RegisterRoutes(e *echo.Echo) {
 	e.GET("/api/v1/balance/:userID", balanceController.GetBalanceByUserID)
 	e.POST("/api/v1/balance/credit", balanceController.CreditBalance)
 	e.POST("/api/v1/balance/debit", balanceController.DebitBalance)
+	e.GET("/api/v1/balances/current", balanceController.GetCurrentBalance)
 }
 
 func (balanceController *BalanceController) GetBalanceByUserID(c echo.Context) error {
@@ -98,5 +99,32 @@ func (balanceController *BalanceController) UpdateBalance(c echo.Context, isCred
 
 	return c.JSON(http.StatusOK, response.GetBalanceResponse{
 		Balance: updatedBalance.Amount,
+	})
+}
+
+func (balanceController *BalanceController) GetCurrentBalance(c echo.Context) error {
+	userIDValue := c.Get("userID")
+	if userIDValue == nil {
+		return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
+			Message: "Unauthorized",
+		})
+	}
+
+	userID, ok := userIDValue.(int64)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
+			Message: "Invalid user context",
+		})
+	}
+
+	balance, err := balanceController.balanceService.GetBalanceByUserID(userID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, response.ErrorResponse{
+			Message: err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, response.GetBalanceResponse{
+		Balance: balance.Amount,
 	})
 }
