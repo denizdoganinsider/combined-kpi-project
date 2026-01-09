@@ -108,6 +108,7 @@ func (userService *UserService) Authenticate(email, password string) (string, er
 
 func validateUserCreate(userCreate model.UserCreate) error {
 	if !strings.Contains(userCreate.Email, common.AT_SYMBOl) {
+		fmt.Println("validateUserCreate is executed")
 		return fmt.Errorf("the given email doesn't contains %s", common.AT_SYMBOl)
 	}
 	return nil
