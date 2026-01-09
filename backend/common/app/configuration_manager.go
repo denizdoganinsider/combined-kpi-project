@@ -24,10 +24,7 @@ func NewConfigurationManager() *ConfigurationManager {
 func getMySqlConfig() mysql.Config {
 	err := godotenv.Load()
 
-	log.Println("denizzzz")
-
 	if err != nil {
-		log.Println("denizzzz 2")
 		log.Fatalf(".env file wasn't loaded: %v", err)
 	}
 
