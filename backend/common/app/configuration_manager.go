@@ -23,15 +23,19 @@ func NewConfigurationManager() *ConfigurationManager {
 
 func getMySqlConfig() mysql.Config {
 	err := godotenv.Load()
+
+	log.Println("denizzzz")
+
 	if err != nil {
+		log.Println("denizzzz 2")
 		log.Fatalf(".env file wasn't loaded: %v", err)
 	}
 
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("DB_username")
+	dbPassword := os.Getenv("DB_password")
+	dbHost := os.Getenv("DB_host")
+	dbPort := os.Getenv("DB_port")
+	dbName := os.Getenv("DB_database_name")
 
 	dbMaxConnections, err := strconv.Atoi(os.Getenv("DB_MAX_CONNECTIONS"))
 	if err != nil {

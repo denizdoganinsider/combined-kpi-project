@@ -3,10 +3,10 @@ package request
 import "myapp-backend/service/model"
 
 type AddUserRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
+	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+	Role     string `json:"role" validate:"omitempty"`
 }
 
 func (addUserRequest AddUserRequest) ToModel() model.UserCreate {

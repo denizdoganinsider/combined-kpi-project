@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -23,50 +23,11 @@ func NewUserController(userService service.IUserService) *UserController {
 }
 
 func (userController *UserController) RegisterRoutes(e *echo.Echo) {
-	/*
-		Should be implemented
-
-		GET /api/v1/users
-		GET /api/v1/users/{id}
-		PUT /api/v1/users/{id}
-		DELETE /api/v1/users/{id}
-
-		Extras
-
-		POST /api/v1/users
-	*/
-
-	e.GET("/", userController.HandleRootPage)
-
-	e.POST("/api/v1/submit", userController.SubmitNewUser)
-
 	e.GET("/api/v1/users", userController.GetAllUsers)
 	e.GET("/api/v1/users/:id", userController.GetUserById)
 	e.POST("/api/v1/users", userController.AddUser)
 	e.PUT("/api/v1/users/:id", userController.UpdateUsername)
 	e.DELETE("/api/v1/users/:id", userController.DeleteUserById)
-}
-
-func (userController *UserController) HandleRootPage(c echo.Context) error {
-	return c.HTML(http.StatusOK,
-		`<form action="/api/v1/submit" method="POST">
-			<label for="name">First name:</label>
-			<input type="text" id="name" name="name"><br><br>
-			<label for="surname">Last name:</label>
-			<input type="text" id="surname" name="surname"><br><br>
-			<input type="submit" value="Submit">
-		</form>`)
-}
-
-func (userController *UserController) SubmitNewUser(c echo.Context) error {
-	firstName := c.FormValue("name")
-	lastName := c.FormValue("surname")
-
-	fmt.Println("Received Form Data:")
-	fmt.Println("First Name:", firstName)
-	fmt.Println("Last Name:", lastName)
-
-	return c.String(http.StatusOK, "Form submitted successfully!")
 }
 
 func (userController *UserController) GetAllUsers(c echo.Context) error {
@@ -97,9 +58,23 @@ func (userController *UserController) GetUserById(c echo.Context) error {
 }
 
 func (userController *UserController) AddUser(c echo.Context) error {
+	if c.Request().ContentLength == 0 {
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Message: "Request body is required",
+		})
+	}
+
+	if c.Request().Header.Get(echo.HeaderContentType) != echo.MIMEApplicationJSON {
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Message: "Content-Type must be application/json",
+		})
+	}
+
 	var addUserRequest request.AddUserRequest
 
 	bindError := c.Bind(&addUserRequest)
+
+	log.Println("Bind Error: ", bindError)
 
 	if bindError != nil {
 		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
