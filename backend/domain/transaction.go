@@ -5,20 +5,19 @@ import (
 	"time"
 )
 
-type TransactionType string
-
-const (
-	CreditTransaction   TransactionType = "credit"
-	DebitTransaction    TransactionType = "debit"
-	TransferTransaction TransactionType = "transfer"
-)
-
 type TransactionStatus string
+type TransactionType string
+type SortOrder string
 
 const (
-	Pending   TransactionStatus = "pending"
-	Completed TransactionStatus = "completed"
-	Failed    TransactionStatus = "failed"
+	CreditTransaction   TransactionType   = "credit"
+	DebitTransaction    TransactionType   = "debit"
+	TransferTransaction TransactionType   = "transfer"
+	SortAsc             SortOrder         = "asc"
+	SortDesc            SortOrder         = "desc"
+	Pending             TransactionStatus = "pending"
+	Completed           TransactionStatus = "completed"
+	Failed              TransactionStatus = "failed"
 )
 
 type Transaction struct {
@@ -29,6 +28,32 @@ type Transaction struct {
 	Type      TransactionType
 	Status    TransactionStatus
 	CreatedAt time.Time
+}
+
+type TransactionFilter struct {
+	UserID int64
+
+	FromTime *time.Time
+	ToTime   *time.Time
+
+	Types    []TransactionType
+	Statuses []TransactionStatus
+
+	MinAmount *float64
+	MaxAmount *float64
+
+	SortBy string
+	Order  SortOrder
+
+	Page  int
+	Limit int
+}
+
+func (f *TransactionFilter) Offset() int {
+	if f.Page <= 1 {
+		return 0
+	}
+	return (f.Page - 1) * f.Limit
 }
 
 func (t *Transaction) Validate() error {

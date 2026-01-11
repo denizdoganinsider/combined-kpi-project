@@ -2,16 +2,18 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 
 	"myapp-backend/domain"
 )
 
 type ITransactionRepository interface {
-	CreateTransaction(transaction *domain.Transaction) error
+	BeginTx() (*sql.Tx, error)
+
+	CreateTransaction(transaction *domain.Transaction, tx *sql.Tx) error
 	GetTransactionByID(id int64) (*domain.Transaction, error)
-	UpdateTransactionStatus(id int64, status domain.TransactionStatus) error
+	UpdateTransactionStatus(id int64, status domain.TransactionStatus, tx *sql.Tx) error
 	GetUserTransactions(userID int64) ([]domain.Transaction, error)
-	UpdateBalance(userID int64, amount float64) error
 }
 
 type TransactionRepository struct {
@@ -22,76 +24,98 @@ func NewTransactionRepository(db *sql.DB) ITransactionRepository {
 	return &TransactionRepository{db: db}
 }
 
-func (repo *TransactionRepository) CreateTransaction(transaction *domain.Transaction) error {
-	var toUser sql.NullInt64
-	if transaction.ToUser != nil {
-		toUser.Int64 = *transaction.ToUser
-		toUser.Valid = true
+/* ---------- TX ---------- */
+
+func (r *TransactionRepository) BeginTx() (*sql.Tx, error) {
+	return r.db.Begin()
+}
+
+/* ---------- WRITE ---------- */
+
+func (r *TransactionRepository) CreateTransaction(t *domain.Transaction, tx *sql.Tx) error {
+	query := `
+		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	res, err := tx.Exec(query, t.FromUser, t.ToUser, t.Amount, t.Type, t.Status, t.CreatedAt)
+	if err != nil {
+		return err
 	}
 
-	query := `INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-	_, err := repo.db.Exec(query, transaction.FromUser, transaction.ToUser, transaction.Amount, transaction.Type, transaction.Status, transaction.CreatedAt)
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	t.ID = id
+	return nil
+}
+
+func (r *TransactionRepository) UpdateTransactionStatus(id int64, status domain.TransactionStatus, tx *sql.Tx) error {
+	if id == 0 {
+		return errors.New("transaction id is zero")
+	}
+
+	_, err := tx.Exec(`UPDATE transactions SET status = ? WHERE id = ?`, status, id)
 	return err
 }
 
-func (repo *TransactionRepository) GetTransactionByID(id int64) (*domain.Transaction, error) {
-	query := `SELECT * FROM transactions WHERE id = ?`
-	row := repo.db.QueryRow(query, id)
+/* ---------- READ ---------- */
 
-	var transaction domain.Transaction
+func (r *TransactionRepository) GetTransactionByID(id int64) (*domain.Transaction, error) {
+	row := r.db.QueryRow(`
+		SELECT id, from_user_id, to_user_id, amount, type, status, created_at
+		FROM transactions
+		WHERE id = ?
+	`, id)
+
+	var t domain.Transaction
 	var toUser sql.NullInt64
-	err := row.Scan(&transaction.ID, &transaction.FromUser, &toUser, &transaction.Amount, &transaction.Type, &transaction.Status, &transaction.CreatedAt)
 
+	err := row.Scan(&t.ID, &t.FromUser, &toUser, &t.Amount, &t.Type, &t.Status, &t.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
 
 	if toUser.Valid {
-		transaction.ToUser = &toUser.Int64
+		t.ToUser = &toUser.Int64
 	}
 
-	return &transaction, nil
+	return &t, nil
 }
 
-func (repo *TransactionRepository) UpdateTransactionStatus(id int64, status domain.TransactionStatus) error {
-	query := `UPDATE transactions SET status = ? WHERE id = ?`
-	_, err := repo.db.Exec(query, status, id)
-	return err
-}
-
-func (repo *TransactionRepository) GetUserTransactions(userID int64) ([]domain.Transaction, error) {
-	query := `SELECT id, from_user_id, to_user_id, amount, type, status, created_at FROM transactions WHERE from_user_id = ? OR to_user_id = ?`
-	rows, err := repo.db.Query(query, userID, userID)
+func (r *TransactionRepository) GetUserTransactions(userID int64) ([]domain.Transaction, error) {
+	rows, err := r.db.Query(`
+		SELECT id, from_user_id, to_user_id, amount, type, status, created_at
+		FROM transactions
+		WHERE from_user_id = ? OR to_user_id = ?
+		ORDER BY created_at DESC
+	`, userID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var transactions []domain.Transaction
+	var list []domain.Transaction
 
 	for rows.Next() {
-		var transaction domain.Transaction
+		var t domain.Transaction
 		var toUser sql.NullInt64
-		err := rows.Scan(&transaction.ID, &transaction.FromUser, &toUser, &transaction.Amount, &transaction.Type, &transaction.Status, &transaction.CreatedAt)
-		if err != nil {
+
+		if err := rows.Scan(&t.ID, &t.FromUser, &toUser, &t.Amount, &t.Type, &t.Status, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 
 		if toUser.Valid {
-			transaction.ToUser = &toUser.Int64
+			t.ToUser = &toUser.Int64
 		}
 
-		transactions = append(transactions, transaction)
+		list = append(list, t)
 	}
 
-	return transactions, nil
-}
-
-func (repo *TransactionRepository) UpdateBalance(userID int64, amount float64) error {
-	query := `UPDATE balances SET amount = amount + ? WHERE user_id = ?`
-	_, err := repo.db.Exec(query, amount, userID)
-	return err
+	return list, nil
 }
