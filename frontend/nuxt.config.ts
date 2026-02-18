@@ -3,11 +3,23 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
   ],
-  compatibilityDate: '2025-04-18',
+
+  ssr: true,
 
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8080'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8080',
+      apiKey: process.env.NUXT_PUPLIC_TMDB_API_KEY || ''
+    }
+  },
+
+  app: {
+    head: {
+      title: 'Movie Tracker',
+      meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'description', content: 'Movie and TV tracking application' }
+      ]
     }
   }
 })
