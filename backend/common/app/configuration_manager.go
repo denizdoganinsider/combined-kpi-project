@@ -11,13 +11,21 @@ import (
 )
 
 type ConfigurationManager struct {
-	MySqlConfig mysql.Config
+	MySqlConfig    mysql.Config
+	FrontendOrigin string
 }
 
 func NewConfigurationManager() *ConfigurationManager {
 	MySqlConfig := getMySqlConfig()
+
+	frontendOrigin := os.Getenv("FRONTEND_ORIGIN")
+	if frontendOrigin == "" {
+		frontendOrigin = "http://localhost:3000"
+	}
+
 	return &ConfigurationManager{
-		MySqlConfig: MySqlConfig,
+		MySqlConfig:    MySqlConfig,
+		FrontendOrigin: frontendOrigin,
 	}
 }
 
